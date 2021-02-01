@@ -1,0 +1,2 @@
+# Python libraries:
+pip install tensorflow-gpu==1.14.0 scikit-image==0.17.2 scikit-learn scipy==1.1.0 imgaug IPython keras==2.2.4 opencv-python==3.4.2.17 jupyter numpy==1.16.4
