@@ -846,6 +846,6 @@ def run_models_on_directory(data_location, output_location, model):
         
         # Save images
         cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
-        tiff.imsave(cnnout_name, processed_image.astype("float16"))
+        tiff.imsave(cnnout_name, processed_image)
 
         counter += 1
