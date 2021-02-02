@@ -32,9 +32,10 @@ from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 import random
 
 from keras import backend as K
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard
 from keras.optimizers import SGD, RMSprop
     
+from datetime import datetime
 
 """
 Helper functions
@@ -691,6 +692,9 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
 
     os.makedirs(name=output_dir, exist_ok=True)
     file_name_save = os.path.join(output_dir, model_name + ".h5")
+    logdir = "logs/scalars/" + model_name
+    tensorboard_callback = TensorBoard(log_dir=logdir)
+
 
     # determine the number of channels and classes
     input_shape = model.layers[0].output_shape
@@ -732,7 +736,7 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
     loss_history = model.fit_generator(train_generator,
                                        steps_per_epoch = int((nb_augmentations+1)*len(train_dict["labels"])/batch_size), 
                                        epochs=n_epoch, validation_data=(X_test,Y_test), 
-                                       callbacks = [ModelCheckpoint(file_name_save, monitor = 'val_loss', verbose = 0, save_best_only = True, mode = 'auto',save_weights_only = True),LearningRateScheduler(lr_sched)])
+                                       callbacks = [ModelCheckpoint(file_name_save, monitor = 'val_loss', verbose = 0, save_best_only = True, mode = 'auto',save_weights_only = True),LearningRateScheduler(lr_sched),tensorboard_callback])
     
 
 """
