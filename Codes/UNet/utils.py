@@ -722,7 +722,7 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
         class_weights[i] = max_number / max( class_weights_sum[i], 1.)
 
     # prepare the model compilation
-    optimizer = RMSprop(lr=1e-4)
+    optimizer = RMSprop(lr=learning_rate)
     model.compile(loss = weighted_crossentropy(class_weights = class_weights), optimizer = optimizer, metrics=['accuracy'])
 
     # prepare the generation of data
