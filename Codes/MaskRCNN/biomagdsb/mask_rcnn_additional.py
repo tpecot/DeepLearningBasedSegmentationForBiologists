@@ -36,20 +36,24 @@ class NucleiDataset(mrcnn_utils.Dataset):
 
             image = skimage.io.imread(imageFile)
             if image.ndim == 1:
-                print("Problem: the images in the training dataset are 1 dimension only")
-                continue
+                sys.exit("Problem: the images in the training dataset are 1 dimension only")
             if image.ndim == 2:
-                new_image = numpy.zeros((image.shape[0], image.shape[1], 3), numpy.uint8)
-                for k in range(3):
-                    new_image[:,:,k] = (image[:, :]).astype('uint8')
-                image = new_image    
+                image_width = image.shape[1]
+                image_height = image.shape[0]
+                
+            if image.ndim == 3:
+                if image.shape[0] < image.shape[2]:
+                    image_width = image.shape[2]
+                    image_height = image.shape[1]
+                else:
+                    image_width = image.shape[1]
+                    image_height = image.shape[0]
             if image.ndim > 3:
-                print("Problem: the images in the training dataset are more than 2D + C")
-                continue
+                sys.exit("Problem: the images in the training dataset are more than 2D + C")
             if image.dtype != numpy.uint8:
                 image = image.astype('uint8')
                 
-            self.add_image(source="nuclei", image_id=imageIndex, path=imageFile, name=baseName, width=image.shape[1], height=image.shape[0], mask_path=maskFile, augmentation_params=None)
+            self.add_image(source="nuclei", image_id=imageIndex, path=imageFile, name=baseName, width=image_width, height=image_height, mask_path=maskFile, augmentation_params=None)
             imageIndex += 1
 
             #adding augmentation parameters
@@ -158,7 +162,11 @@ class NucleiDataset(mrcnn_utils.Dataset):
         
         mask = skimage.io.imread(maskPath)
         if mask.ndim > 2:
-            mask = mask[:,:,0]
+            if mask.shape[0] < mask.shape[2]:
+                mask = mask[0, :, :]
+            else:
+                mask = mask[:,:,0]
+        
         
         segmap = SegmentationMapsOnImage(mask, shape=image.shape)
         

@@ -2,12 +2,31 @@ import numpy
 import skimage
 
 def RCNNConvertInputImage(pImageData):
-    if pImageData.ndim < 2:
-        raise ValueError("Invalid image")
-    elif pImageData.ndim < 3:
+    
+    if pImageData.ndim == 2:
         pImageData = skimage.color.gray2rgb(pImageData)
-    if pImageData.shape[2] > 3:
-        pImageData = pImageData[:, :, :3]
+    if pImageData.ndim == 3:
+        if pImageData.shape[0] < pImageData.shape[2]:
+            new_pImageData = numpy.zeros((pImageData.shape[1], pImageData.shape[2], 3), numpy.uint8)
+            for k in range(pImageData.shape[0]):
+                new_pImageData[:,:,k] = (pImageData[k, :, :]).astype('uint8')
+            for k in range(pImageData.shape[0], 3):
+                new_pImageData[:,:,k] = (pImageData[pImageData.shape[0]-1, :, :]).astype('uint8')
+            pImageData = new_pImageData
+        elif pImageData.shape[2] < 3:
+            new_pImageData = numpy.zeros((pImageData.shape[0], pImageData.shape[1], 3), numpy.uint8)
+            for k in range(pImageData.shape[2]):
+                new_pImageData[:,:,k] = (pImageData[:, :, k]).astype('uint8')
+            for k in range(pImageData.shape[2], 3):
+                new_pImageData[:,:,k] = (pImageData[:, :, pImageData.shape[2]-1]).astype('uint8')
+            pImageData = new_pImageData
+            
+#    if pImageData.ndim < 2:
+#        raise ValueError("Invalid image")
+#    elif pImageData.ndim < 3:
+#        pImageData = skimage.color.gray2rgb(pImageData)
+#    if pImageData.shape[2] > 3:
+#        pImageData = pImageData[:, :, :3]
 
     return pImageData
 
