@@ -35,37 +35,287 @@ from keras import backend as K
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard
 from keras.optimizers import SGD, RMSprop
     
-from datetime import datetime
+import datetime
+
+import ipywidgets as widgets
+import ipyfilechooser
+from ipyfilechooser import FileChooser
+from ipywidgets import HBox, Label, Layout
+
+from models import unet as unet
+
 
 """
-Helper functions
+Interfaces
 """
-def extract_channels(input_image_dir, output_image_dir, channels):
-    imageFiles = [f for f in os.listdir(input_image_dir) if os.path.isfile(os.path.join(input_image_dir, f))]
-    os.makedirs(name=output_image_dir, exist_ok=True)
 
+def extract_channels_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input directory")
+    input_dir = FileChooser('./datasets')
+    display(input_dir)
+    print('\x1b[1m'+"Output directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+    channel_1 = widgets.Checkbox(value=True, description='Channel 1',disabled=False)
+    display(channel_1)
+    channel_2 = widgets.Checkbox(value=False, description='Channel 2',disabled=False)
+    display(channel_2)
+    channel_3 = widgets.Checkbox(value=False, description='Channel 3',disabled=False)
+    display(channel_3)
+    channel_4 = widgets.Checkbox(value=False, description='Channel 4',disabled=False)
+    display(channel_4)
+    channel_5 = widgets.Checkbox(value=False, description='Channel 5',disabled=False)
+    display(channel_5)
+    channel_6 = widgets.Checkbox(value=False, description='Channel 6',disabled=False)
+    display(channel_6)
+    channel_7 = widgets.Checkbox(value=False, description='Channel 7',disabled=False)
+    display(channel_7)
+
+    parameters.append(input_dir)
+    parameters.append(output_dir)
+    parameters.append(channel_1)
+    parameters.append(channel_2)
+    parameters.append(channel_3)
+    parameters.append(channel_4)
+    parameters.append(channel_5)
+    parameters.append(channel_6)
+    parameters.append(channel_7)
+    return parameters
+
+def divide_images_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input directory")
+    input_dir = FileChooser('./datasets')
+    display(input_dir)
+    print('\x1b[1m'+"Output directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+
+    label_layout = Layout(width='100px',height='30px')
+
+    width_divider = HBox([Label('Width divider:', layout=label_layout), widgets.IntText(
+        value=2, description='', disabled=False)])
+    display(width_divider)
+    height_divider = HBox([Label('Height divider:', layout=label_layout), widgets.IntText(
+        value=2, description='', disabled=False)])
+    display(height_divider)
+    
+    parameters.append(input_dir)
+    parameters.append(output_dir)
+    parameters.append(width_divider)
+    parameters.append(height_divider)
+    return parameters
+
+def instance_to_semantic_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input mask directory")
+    input_dir = FileChooser('./datasets')
+    display(input_dir)
+    print('\x1b[1m'+"Output mask directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+    
+    parameters.append(input_dir)
+    parameters.append(output_dir)
+    return parameters
+
+def training_parameters_interface(nb_trainings):
+    training_dir = np.zeros([nb_trainings], FileChooser)
+    validation_dir = np.zeros([nb_trainings], FileChooser)
+    output_dir = np.zeros([nb_trainings], FileChooser)
+    nb_channels = np.zeros([nb_trainings], HBox)
+    nb_classes = np.zeros([nb_trainings], HBox)
+    imaging_field_x = np.zeros([nb_trainings], HBox)
+    imaging_field_y = np.zeros([nb_trainings], HBox)
+    learning_rate = np.zeros([nb_trainings], HBox)
+    nb_epochs = np.zeros([nb_trainings], HBox)
+    nb_augmentations = np.zeros([nb_trainings], HBox)
+    batch_size = np.zeros([nb_trainings], HBox)
+    train_to_val_ratio = np.zeros([nb_trainings], HBox)
+    
+    parameters = []
+    for i in range(nb_trainings):
+        print('\x1b[1m'+"Training directory")
+        training_dir[i] = FileChooser('./datasets')
+        display(training_dir[i])
+        print('\x1b[1m'+"Validation directory")
+        validation_dir[i] = FileChooser('./datasets')
+        display(validation_dir[i])
+        print('\x1b[1m'+"Output directory")
+        output_dir[i] = FileChooser('./trainedClassifiers')
+        display(output_dir[i])
+
+        label_layout = Layout(width='180px',height='30px')
+
+        nb_channels[i] = HBox([Label('Number of channels:', layout=label_layout), widgets.IntText(
+            value=1, description='', disabled=False)])
+        display(nb_channels[i])
+
+        nb_classes[i] = HBox([Label('Number of classes:', layout=label_layout), widgets.IntText(
+            value=3, description='', disabled=False)])
+        display(nb_classes[i])
+
+        imaging_field_x[i] = HBox([Label('Imaging field in x:', layout=label_layout), widgets.IntText(
+            value=256, description='', disabled=False)])
+        display(imaging_field_x[i])
+
+        imaging_field_y[i] = HBox([Label('Imaging field in y:', layout=label_layout), widgets.IntText(
+            value=256, description='', disabled=False)])
+        display(imaging_field_y[i])
+
+        learning_rate[i] = HBox([Label('Learning rate:', layout=label_layout), widgets.FloatText(
+            value=1e-4, description='', disabled=False)])
+        display(learning_rate[i])
+
+        nb_epochs[i] = HBox([Label('Number of epochs:', layout=label_layout), widgets.IntText(
+            value=100, description='', disabled=False)])
+        display(nb_epochs[i])
+
+        nb_augmentations[i] = HBox([Label('Number of augmentations:', layout=label_layout), widgets.IntText(
+            value=0, description='', disabled=False)])
+        display(nb_augmentations[i])
+
+        batch_size[i] = HBox([Label('Batch size:', layout=label_layout), widgets.IntText(
+            value=1, description='', disabled=False)])
+        display(batch_size[i])
+
+        train_to_val_ratio[i] = HBox([Label('Ratio of training in validation:', layout=label_layout), widgets.BoundedFloatText(
+            value=0.2, min=0.01, max=0.99, step=0.01, description='', disabled=False, color='black'
+        )])
+        display(train_to_val_ratio[i])
+
+    parameters.append(training_dir)
+    parameters.append(validation_dir)
+    parameters.append(output_dir)
+    parameters.append(nb_channels)
+    parameters.append(nb_classes)
+    parameters.append(imaging_field_x)
+    parameters.append(imaging_field_y)
+    parameters.append(learning_rate)
+    parameters.append(nb_epochs)
+    parameters.append(nb_augmentations)
+    parameters.append(batch_size)
+    parameters.append(train_to_val_ratio)
+    
+    return parameters  
+
+def running_parameters_interface(nb_trainings):
+    input_dir = np.zeros([nb_trainings], FileChooser)
+    input_classifier = np.zeros([nb_trainings], FileChooser)
+    output_dir = np.zeros([nb_trainings], FileChooser)
+    output_mode = np.zeros([nb_trainings], HBox)
+    nb_channels = np.zeros([nb_trainings], HBox)
+    nb_classes = np.zeros([nb_trainings], HBox)
+    imaging_field_x = np.zeros([nb_trainings], HBox)
+    imaging_field_y = np.zeros([nb_trainings], HBox)
+    
+    parameters = []
+    for i in range(nb_trainings):
+        print('\x1b[1m'+"Input directory")
+        input_dir[i] = FileChooser('./datasets')
+        display(input_dir[i])
+        print('\x1b[1m'+"Input classifier")
+        input_classifier[i] = FileChooser('./trainedClassifiers')
+        display(input_classifier[i])
+        print('\x1b[1m'+"Output directory")
+        output_dir[i] = FileChooser('./datasets')
+        display(output_dir[i])
+
+        label_layout = Layout(width='150px',height='30px')
+
+        output_mode[i] = HBox([Label('Score:', layout=label_layout), widgets.Checkbox(
+            value=False, description='',disabled=False)])
+        display(output_mode[i])
+        
+        nb_channels[i] = HBox([Label('Number of channels:', layout=label_layout), widgets.IntText(
+            value=1, description='', disabled=False)])
+        display(nb_channels[i])
+
+        nb_classes[i] = HBox([Label('Number of classes:', layout=label_layout), widgets.IntText(
+            value=3, description='', disabled=False)])
+        display(nb_classes[i])
+
+        imaging_field_x[i] = HBox([Label('Imaging field in x:', layout=label_layout), widgets.IntText(
+            value=256, description='', disabled=False)])
+        display(imaging_field_x[i])
+
+        imaging_field_y[i] = HBox([Label('Imaging field in y:', layout=label_layout), widgets.IntText(
+            value=256, description='', disabled=False)])
+        display(imaging_field_y[i])
+
+    parameters.append(input_dir)
+    parameters.append(input_classifier)
+    parameters.append(output_dir)
+    parameters.append(output_mode)
+    parameters.append(nb_channels)
+    parameters.append(nb_classes)
+    parameters.append(imaging_field_x)
+    parameters.append(imaging_field_y)
+    
+    return parameters  
+
+"""
+Pre-processing functions 
+"""
+    
+def extract_channels(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an output directory")
+    imageFiles = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
+    os.makedirs(name=parameters[1].selected, exist_ok=True)
+
+    channels = []
+    if parameters[2].value==True:
+        channels.append(0)
+    if parameters[3].value==True:
+        channels.append(1)
+    if parameters[4].value==True:
+        channels.append(2)
+    if parameters[5].value==True:
+        channels.append(3)
+    if parameters[6].value==True:
+        channels.append(4)
+    if parameters[7].value==True:
+        channels.append(5)
+    if parameters[8].value==True:
+        channels.append(6)
+    if len(channels)==0:
+        sys.exit("You need to select at least one channel")
     for index, imageFile in enumerate(imageFiles):
-        imagePath = os.path.join(input_image_dir, imageFile)
+        imagePath = os.path.join(parameters[0].selected, imageFile)
         baseName = os.path.splitext(os.path.basename(imageFile))[0]
         image = skimage.io.imread(imagePath)
         if image.shape[0]<image.shape[-1]:
             output_image = np.zeros((len(channels), image.shape[1], image.shape[2]), np.uint16)
             for i in range(len(channels)):
                 output_image[i, :, :] = (image[channels[i], :, :]).astype('uint16')
-            tiff.imsave(os.path.join(output_image_dir, baseName + ".tiff"), output_image)
+            tiff.imsave(os.path.join(parameters[1].selected, baseName + ".tiff"), output_image)
             
         else:
             output_image = np.zeros((len(channels), image.shape[0], image.shape[1]), np.uint16)
             for i in range(len(channels)):
                 output_image[i, :, :] = (image[:, :,channels[i]]).astype('uint16')
-            tiff.imsave(os.path.join(output_image_dir, baseName + ".tiff"), output_image)
+            tiff.imsave(os.path.join(parameters[1].selected, baseName + ".tiff"), output_image)
 
-def divide_images(input_image_dir, output_image_dir, height_divider, width_divider):
-    imageFiles = [f for f in os.listdir(input_image_dir) if os.path.isfile(os.path.join(input_image_dir, f))]
-    os.makedirs(name=output_image_dir, exist_ok=True)
+def divide_images(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an output directory")
+    imageFiles = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
+    os.makedirs(name=parameters[1].selected, exist_ok=True)
 
     for index, imageFile in enumerate(imageFiles):
-        imagePath = os.path.join(input_image_dir, imageFile)
+        imagePath = os.path.join(parameters[0].selected, imageFile)
         baseName = os.path.splitext(os.path.basename(imageFile))[0]
         image = skimage.io.imread(imagePath)
         
@@ -74,43 +324,50 @@ def divide_images(input_image_dir, output_image_dir, height_divider, width_divid
         nb_channels = 1
         if len(image.shape)>2:
             if image.shape[0]<image.shape[-1]:
-                width = int(image.shape[1]/width_divider)
-                height = int(image.shape[2]/height_divider)
+                width = int(image.shape[1]/parameters[3].children[1].value)
+                height = int(image.shape[2]/parameters[2].children[1].value)
+                width_channel = 1
+                height_channel = 2
                 nb_Channels = image.shape[0]
             else:
-                width = int(image.shape[0]/width_divider)
-                height = int(image.shape[1]/height_divider)
+                width = int(image.shape[0]/parameters[3].children[1].value)
+                height = int(image.shape[1]/parameters[2].children[1].value)
                 nb_Channels = image.shape[2]
         else:
-            width = int(image.shape[0]/width_divider)
-            height = int(image.shape[1]/height_divider)
+            width = int(image.shape[0]/parameters[3].children[1].value)
+            height = int(image.shape[1]/parameters[2].children[1].value)
                 
-        for i in range(width_divider):
-            for j in range(height_divider):
-                x_init = int((image.shape[width_channel]/width_divider)*i)
+        for i in range(parameters[3].children[1].value):
+            for j in range(parameters[2].children[1].value):
+                x_init = int((image.shape[width_channel]/parameters[3].children[1].value)*i)
                 x_end = x_init + width
-                y_init = int((image.shape[height_channel]/height_divider)*j)
+                y_init = int((image.shape[height_channel]/parameters[2].children[1].value)*j)
                 y_end = y_init + height
             
-                output_image = np.zeros((nb_channels, width, height), np.uint16)
                 if len(image.shape)==2:
-                    output_image[0, :, :] = (image[x_init:x_end, y_init:y_end]).astype('uint16')
-                    tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+                    output_image = np.zeros((width, height), np.uint16)
+                    output_image = (image[x_init:x_end, y_init:y_end]).astype('uint16')
+                    tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
                 else:
+                    output_image = np.zeros((nb_channels, width, height), np.uint16)
                     if image.shape[0]<image.shape[-1]:
                         output_image = (image[:, x_init:x_end, y_init:y_end]).astype('uint16')
-                        tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+                        tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
                     else:
                         output_image = (image[x_init:x_end, y_init:y_end, :]).astype('uint16')
-                        tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
-            
+                        tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
 
-def instance_to_semantic(input_masks_dir, output_masks_dir):
-    os.makedirs(name=output_masks_dir, exist_ok=True)
+                        
+def instance_to_semantic(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory for masks")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an output directory for masks")
+    os.makedirs(name=parameters[1].selected, exist_ok=True)
 
-    maskFiles = [f for f in os.listdir(input_masks_dir) if os.path.isfile(os.path.join(input_masks_dir, f))]   
+    maskFiles = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]   
     for index, maskFile in enumerate(maskFiles):
-        maskPath = os.path.join(input_masks_dir, maskFile)
+        maskPath = os.path.join(parameters[0].selected, maskFile)
         baseName = os.path.splitext(os.path.basename(maskFile))[0]
         mask = skimage.io.imread(maskPath)
     
@@ -165,8 +422,46 @@ def instance_to_semantic(input_masks_dir, output_masks_dir):
                         else:
                             mask_UNet[1, x, y] = 1
         
-        tiff.imsave(os.path.join(output_masks_dir, baseName + ".tiff"), mask_UNet)
+        tiff.imsave(os.path.join(parameters[1].selected, baseName + ".tiff"), mask_UNet)
 
+        
+"""
+Training and processing calling functions 
+"""
+
+def training(nb_trainings, parameters):
+    for i in range(nb_trainings):
+        if parameters[0][i].selected==None:
+            sys.exit("Training #"+str(i+1)+": You need to select an input directory for training")
+        if parameters[2][i].selected==None:
+            sys.exit("Training #"+str(i+1)+": You need to select an output directory for the trained classifier")
+    
+
+        model = unet(parameters[4][i].children[1].value, parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[3][i].children[1].value)
+        model_name = "UNet_"+str(parameters[3][i].children[1].value)+"channels_"+str(parameters[4][i].children[1].value)+"classes_"+str(parameters[5][i].children[1].value)+"_"+str(parameters[6][i].children[1].value)+"_lr_"+str(parameters[7][i].children[1].value)+"_"+str(parameters[9][i].children[1].value)+"DA_"+str(parameters[8][i].children[1].value)+"ep"
+
+        train_model_sample(model, parameters[0][i].selected, parameters[1][i].selected, model_name,parameters[10][i].children[1].value, parameters[8][i].children[1].value, parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[2][i].selected, parameters[7][i].children[1].value, parameters[9][i].children[1].value, parameters[11][i].children[1].value)
+        del model
+        
+        
+
+def running(nb_runnings, parameters):
+    for i in range(nb_runnings):
+        if parameters[0][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select an input directory for images to be processed")
+        if parameters[1][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select a trained classifier to run your images")
+        if parameters[2][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select an output directory for processed images")
+
+        model = unet(parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[7][i].children[1].value, parameters[4][i].children[1].value, parameters[1][i].selected)
+        run_models_on_directory(parameters[0][i].selected, parameters[2][i].selected, model, parameters[3][i].children[1].value)
+        del model
+    
+        
+"""
+Useful functions 
+"""
     
 def rate_scheduler(lr = .001, decay = 0.95):
     def output_fn(epoch):
@@ -690,9 +985,14 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
                        output_dir = "./trained_classifiers/", learning_rate = 1e-3, nb_augmentations = 0,
                        train_to_val_ratio = 0.2):
 
+    if dataset_training is None:
+        sys.exit("The input training dataset needs to be defined")
+    if output_dir is None:
+        sys.exit("The output directory for trained classifier needs to be defined")
+    
     os.makedirs(name=output_dir, exist_ok=True)
     file_name_save = os.path.join(output_dir, model_name + ".h5")
-    logdir = "logs/scalars/" + model_name
+    logdir = "logs/scalars/" + model_name + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = TensorBoard(log_dir=logdir)
 
 
@@ -774,7 +1074,7 @@ def get_images_from_directory(data_location):
         all_channels = np.zeros((1, current_img.shape[0], current_img.shape[1], current_img.shape[2]), dtype = 'float32')
         all_channels[0, :, :, :] = current_img
         all_images += [all_channels]
-        
+            
     return all_images
 
 def run_model(img, model, imaging_field_x = 256, imaging_field_y = 256):
@@ -814,7 +1114,7 @@ def run_model(img, model, imaging_field_x = 256, imaging_field_y = 256):
     return model_output
 
 
-def run_models_on_directory(data_location, output_location, model):
+def run_models_on_directory(data_location, output_location, model, score):
 
     # create output folder if it doesn't exist
     os.makedirs(name=output_location, exist_ok=True)
@@ -848,8 +1148,17 @@ def run_models_on_directory(data_location, output_location, model):
         print("Processing image ",str(counter + 1)," of ",str(len(image_list)))
         processed_image = run_model(img, model, imaging_field_x = imaging_field_x, imaging_field_y = imaging_field_y)
         
-        # Save images
-        cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
-        tiff.imsave(cnnout_name, processed_image)
+        if score==False:
+            output_image = np.zeros((processed_image.shape[2], processed_image.shape[0], processed_image.shape[1]), np.uint16)
+            max_channels = np.argmax(processed_image, axis=2)
+            for i in range(output_image.shape[0]):
+                output_image[i-1, : , :] = np.where(max_channels == i, 1, 0)
+            # Save images
+            cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
+            tiff.imsave(cnnout_name, output_image)
+        else:
+            # Save images
+            cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
+            tiff.imsave(cnnout_name, processed_image)
 
         counter += 1
