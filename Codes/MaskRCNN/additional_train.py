@@ -186,6 +186,7 @@ class MaskTrain:
             mdl.load_weights(inModelPath, by_name=True)
 
         allcount = 0
+        logdir = "logs/scalars/" + self.__mParams["model_name"]
         for epochgroup in self.__mParams["epoch_groups"]:
             epochs = int(epochgroup["epochs"])
             if epochs < 1:
@@ -344,6 +345,6 @@ class MaskTrain:
             if epochs < 1:
                 continue
             allcount += epochs
-            mdl.train(dataset_train,dataset_val,learning_rate=float(epochgroup["learning_rate"]), epochs=allcount,layers=epochgroup["layers"])
+            mdl.train(dataset_train,dataset_val,learning_rate=float(epochgroup["learning_rate"]), epochs=allcount)
 
         mdl.keras_model.save_weights(outModelPath)

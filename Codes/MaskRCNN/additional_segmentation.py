@@ -111,7 +111,21 @@ class Segmentation:
             baseName = os.path.splitext(os.path.basename(imageFile))[0]
             imagePath = os.path.join(imagesDir, imageFile)
             image = skimage.io.imread(imagePath)
-            
+            if len(image.shape)>2:
+                if image.shape[0]<image.shape[2]:
+                    new_image = numpy.zeros((image.shape[1], image.shape[2], 3), numpy.uint16)
+                    for k in range(image.shape[0]):
+                        new_image[:, :, k] = image[k, :, :]
+                    for k in range(image.shape[0], 3):
+                        new_image[:, :, k] = image[image.shape[0] - 1, :, :]
+                    image = new_image
+            elif len(image.shape)==2:
+                new_image = numpy.zeros((image.shape[0], image.shape[1], 3), numpy.uint16)
+                for k in range(3):
+                    new_image[:, :, k] = image
+                image = new_image
+                    
+            print(image.shape)
             image_size_x = image.shape[1]
             image_size_y = image.shape[0]
             
