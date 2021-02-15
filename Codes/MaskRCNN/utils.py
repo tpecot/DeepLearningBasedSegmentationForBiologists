@@ -372,7 +372,7 @@ def training(nb_trainings, parameters):
             else:
                 sys.exit("Training #"+str(i+1)+": You need to train heads, all network or both")
 
-        model = additional_train.MaskTrain(parameters[0][i].selected, parameters[1][i].selected, parameters[2][i].selected, parameters[3][i].selected, model_name, epoch_groups, parameters[10][i].children[1].value, 0, parameters[11][i].children[1].value, True, 512)
+        model = additional_train.MaskTrain(parameters[0][i].selected, parameters[1][i].selected, parameters[2][i].selected, parameters[3][i].selected, model_name, epoch_groups, parameters[10][i].children[1].value, 0, parameters[11][i].children[1].value, True, 0.5, 0.6, 512)
         model.Train()
         
         
