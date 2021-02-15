@@ -30,40 +30,280 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 import random
 
-from keras import backend as K
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras.optimizers import SGD, RMSprop
+import ipywidgets as widgets
+import ipyfilechooser
+from ipyfilechooser import FileChooser
+from ipywidgets import HBox, Label, Layout
+
+import sys
+sys.path.append("Mask_RCNN-2.1")
+import mrcnn_model
+import mrcnn_utils
+sys.path.append("biomagdsb")
+import mask_rcnn_additional
+import additional_train
+import additional_segmentation
+
+
+"""
+Interfaces
+"""
+
+def TensorBoard_interface():
     
+    print('\x1b[1m'+"Model location")
+    classifier_directory = FileChooser('./trainedClassifiers')
+    display(classifier_directory)
+    
+    return classifier_directory
+
+def extract_channels_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input directory")
+    input_dir = FileChooser('./datasets')
+    display(input_dir)
+    print('\x1b[1m'+"Output directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+    channel_1 = widgets.Checkbox(value=True, description='Channel 1',disabled=False)
+    display(channel_1)
+    channel_2 = widgets.Checkbox(value=False, description='Channel 2',disabled=False)
+    display(channel_2)
+    channel_3 = widgets.Checkbox(value=False, description='Channel 3',disabled=False)
+    display(channel_3)
+    channel_4 = widgets.Checkbox(value=False, description='Channel 4',disabled=False)
+    display(channel_4)
+    channel_5 = widgets.Checkbox(value=False, description='Channel 5',disabled=False)
+    display(channel_5)
+    channel_6 = widgets.Checkbox(value=False, description='Channel 6',disabled=False)
+    display(channel_6)
+    channel_7 = widgets.Checkbox(value=False, description='Channel 7',disabled=False)
+    display(channel_7)
+
+    parameters.append(input_dir)
+    parameters.append(output_dir)
+    parameters.append(channel_1)
+    parameters.append(channel_2)
+    parameters.append(channel_3)
+    parameters.append(channel_4)
+    parameters.append(channel_5)
+    parameters.append(channel_6)
+    parameters.append(channel_7)
+    return parameters
+
+def divide_images_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input directory")
+    input_dir = FileChooser('./datasets')
+    display(input_dir)
+    print('\x1b[1m'+"Output directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+
+    label_layout = Layout(width='100px',height='30px')
+
+    width_divider = HBox([Label('Width divider:', layout=label_layout), widgets.IntText(
+        value=2, description='', disabled=False)])
+    display(width_divider)
+    height_divider = HBox([Label('Height divider:', layout=label_layout), widgets.IntText(
+        value=2, description='', disabled=False)])
+    display(height_divider)
+    
+    parameters.append(input_dir)
+    parameters.append(output_dir)
+    parameters.append(width_divider)
+    parameters.append(height_divider)
+    return parameters
+
+def training_parameters_interface(nb_trainings):
+    training_dir = np.zeros([nb_trainings], FileChooser)
+    validation_dir = np.zeros([nb_trainings], FileChooser)
+    input_model = np.zeros([nb_trainings], FileChooser)
+    output_dir = np.zeros([nb_trainings], FileChooser)
+    heads_training = np.zeros([nb_trainings], HBox)
+    nb_epochs_heads = np.zeros([nb_trainings], HBox)
+    learning_rate_heads = np.zeros([nb_trainings], HBox)
+    all_network_training = np.zeros([nb_trainings], HBox)
+    nb_epochs_all = np.zeros([nb_trainings], HBox)
+    learning_rate_all = np.zeros([nb_trainings], HBox)
+    nb_augmentations = np.zeros([nb_trainings], HBox)
+    train_to_val_ratio = np.zeros([nb_trainings], HBox)
+    
+    parameters = []
+    for i in range(nb_trainings):
+        print('\x1b[1m'+"Training directory")
+        training_dir[i] = FileChooser('./datasets')
+        display(training_dir[i])
+        print('\x1b[1m'+"Validation directory")
+        validation_dir[i] = FileChooser('./datasets')
+        display(validation_dir[i])
+        print('\x1b[1m'+"Input model")
+        input_model[i] = FileChooser('./pretrainedClassifiers')
+        display(input_model[i])
+        print('\x1b[1m'+"Output directory")
+        output_dir[i] = FileChooser('./trainedClassifiers')
+        display(output_dir[i])
+
+        label_layout = Layout(width='250px',height='30px')
+
+        heads_training[i] = HBox([Label('Training heads only first:', layout=label_layout), widgets.Checkbox(
+            value=True, description='',disabled=False)])
+        display(heads_training[i])
+
+        nb_epochs_heads[i] = HBox([Label('Number of epochs for heads training:', layout=label_layout), widgets.IntText(
+            value=1, description='', disabled=False)])
+        display(nb_epochs_heads[i])
+
+        learning_rate_heads[i] = HBox([Label('Learning rate for heads training:', layout=label_layout), widgets.FloatText(
+            value=0.001, description='', disabled=False)])
+        display(learning_rate_heads[i])
+
+        all_network_training[i] = HBox([Label('Training all network:', layout=label_layout), widgets.Checkbox(
+            value=True, description='',disabled=False)])
+        display(all_network_training[i])
+
+        nb_epochs_all[i] = HBox([Label('Number of epochs for all network training:', layout=label_layout), widgets.IntText(
+            value=3, description='', disabled=False)])
+        display(nb_epochs_all[i])
+
+        learning_rate_all[i] = HBox([Label('Learning rate for all network training:', layout=label_layout), widgets.FloatText(
+            value=0.0005, description='', disabled=False)])
+        display(learning_rate_all[i])
+
+        nb_augmentations[i] = HBox([Label('Number of augmentations:', layout=label_layout), widgets.IntText(
+            value=100, description='', disabled=False)])
+        display(nb_augmentations[i])
+
+        train_to_val_ratio[i] = HBox([Label('Ratio of training in validation:', layout=label_layout), widgets.BoundedFloatText(
+            value=0.2, min=0.01, max=0.99, step=0.01, description='', disabled=False, color='black'
+        )])
+        display(train_to_val_ratio[i])
+
+    parameters.append(training_dir)
+    parameters.append(validation_dir)
+    parameters.append(input_model)
+    parameters.append(output_dir)
+    parameters.append(heads_training)
+    parameters.append(nb_epochs_heads)
+    parameters.append(learning_rate_heads)
+    parameters.append(all_network_training)
+    parameters.append(nb_epochs_all)
+    parameters.append(learning_rate_all)
+    parameters.append(nb_augmentations)
+    parameters.append(train_to_val_ratio)
+    
+    return parameters  
+
+def running_parameters_interface(nb_trainings):
+    input_dir = np.zeros([nb_trainings], FileChooser)
+    input_classifier = np.zeros([nb_trainings], FileChooser)
+    output_dir = np.zeros([nb_trainings], FileChooser)
+    image_size = np.zeros([nb_trainings], HBox)
+    
+    parameters = []
+    for i in range(nb_trainings):
+        print('\x1b[1m'+"Input directory")
+        input_dir[i] = FileChooser('./datasets')
+        display(input_dir[i])
+        print('\x1b[1m'+"Input classifier")
+        input_classifier[i] = FileChooser('./trainedClassifiers')
+        display(input_classifier[i])
+        print('\x1b[1m'+"Output directory")
+        output_dir[i] = FileChooser('./datasets')
+        display(output_dir[i])
+
+        label_layout = Layout(width='215px',height='30px')
+
+        image_size[i] = HBox([Label('Image size as seen by the network:', layout=label_layout), widgets.IntText(
+            value=1536, description='', disabled=False)])
+        display(image_size[i])
+
+    parameters.append(input_dir)
+    parameters.append(input_classifier)
+    parameters.append(output_dir)
+    parameters.append(image_size)
+    
+    return parameters  
+
+def combine_instance_segmentations_interface():
+    
+    parameters = []
+    
+    print('\x1b[1m'+"Input directory for Mask R-CNN segmentations")
+    input_dir1 = FileChooser('./datasets')
+    display(input_dir1)
+    print('\x1b[1m'+"Input directory for U-Net segmentations")
+    input_dir2 = FileChooser('./datasets')
+    display(input_dir2)
+    print('\x1b[1m'+"Output directory")
+    output_dir = FileChooser('./datasets')
+    display(output_dir)
+
+    parameters.append(input_dir1)
+    parameters.append(input_dir2)
+    parameters.append(output_dir)
+    return parameters
+
 
 """
-Helper functions
+Pre-processing functions 
 """
-def extract_channels(input_image_dir, output_image_dir, channels):
-    imageFiles = [f for f in os.listdir(input_image_dir) if os.path.isfile(os.path.join(input_image_dir, f))]
-    os.makedirs(name=output_image_dir, exist_ok=True)
 
+def extract_channels(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an output directory")
+    imageFiles = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
+    os.makedirs(name=parameters[1].selected, exist_ok=True)
+
+    channels = []
+    if parameters[2].value==True:
+        channels.append(0)
+    if parameters[3].value==True:
+        channels.append(1)
+    if parameters[4].value==True:
+        channels.append(2)
+    if parameters[5].value==True:
+        channels.append(3)
+    if parameters[6].value==True:
+        channels.append(4)
+    if parameters[7].value==True:
+        channels.append(5)
+    if parameters[8].value==True:
+        channels.append(6)
+    if len(channels)==0:
+        sys.exit("You need to select at least one channel")
     for index, imageFile in enumerate(imageFiles):
-        imagePath = os.path.join(input_image_dir, imageFile)
+        imagePath = os.path.join(parameters[0].selected, imageFile)
         baseName = os.path.splitext(os.path.basename(imageFile))[0]
         image = skimage.io.imread(imagePath)
         if image.shape[0]<image.shape[-1]:
             output_image = np.zeros((len(channels), image.shape[1], image.shape[2]), np.uint16)
             for i in range(len(channels)):
                 output_image[i, :, :] = (image[channels[i], :, :]).astype('uint16')
-            tiff.imsave(os.path.join(output_image_dir, baseName + ".tiff"), output_image)
+            tiff.imsave(os.path.join(parameters[1].selected, baseName + ".tiff"), output_image)
             
         else:
             output_image = np.zeros((len(channels), image.shape[0], image.shape[1]), np.uint16)
             for i in range(len(channels)):
                 output_image[i, :, :] = (image[:, :,channels[i]]).astype('uint16')
-            tiff.imsave(os.path.join(output_image_dir, baseName + ".tiff"), output_image)
+            tiff.imsave(os.path.join(parameters[1].selected, baseName + ".tiff"), output_image)
 
-def divide_images(input_image_dir, output_image_dir, height_divider, width_divider):
-    imageFiles = [f for f in os.listdir(input_image_dir) if os.path.isfile(os.path.join(input_image_dir, f))]
-    os.makedirs(name=output_image_dir, exist_ok=True)
+def divide_images(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an output directory")
+    imageFiles = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
+    os.makedirs(name=parameters[1].selected, exist_ok=True)
 
     for index, imageFile in enumerate(imageFiles):
-        imagePath = os.path.join(input_image_dir, imageFile)
+        imagePath = os.path.join(parameters[0].selected, imageFile)
         baseName = os.path.splitext(os.path.basename(imageFile))[0]
         image = skimage.io.imread(imagePath)
         
@@ -72,36 +312,172 @@ def divide_images(input_image_dir, output_image_dir, height_divider, width_divid
         nb_channels = 1
         if len(image.shape)>2:
             if image.shape[0]<image.shape[-1]:
-                width = int(image.shape[1]/width_divider)
-                height = int(image.shape[2]/height_divider)
+                width = int(image.shape[1]/parameters[3].children[1].value)
+                height = int(image.shape[2]/parameters[2].children[1].value)
+                width_channel = 1
+                height_channel = 2
                 nb_Channels = image.shape[0]
             else:
-                width = int(image.shape[0]/width_divider)
-                height = int(image.shape[1]/height_divider)
+                width = int(image.shape[0]/parameters[3].children[1].value)
+                height = int(image.shape[1]/parameters[2].children[1].value)
                 nb_Channels = image.shape[2]
         else:
-            width = int(image.shape[0]/width_divider)
-            height = int(image.shape[1]/height_divider)
+            width = int(image.shape[0]/parameters[3].children[1].value)
+            height = int(image.shape[1]/parameters[2].children[1].value)
                 
-        for i in range(width_divider):
-            for j in range(height_divider):
-                x_init = int((image.shape[width_channel]/width_divider)*i)
+        for i in range(parameters[3].children[1].value):
+            for j in range(parameters[2].children[1].value):
+                x_init = int((image.shape[width_channel]/parameters[3].children[1].value)*i)
                 x_end = x_init + width
-                y_init = int((image.shape[height_channel]/height_divider)*j)
+                y_init = int((image.shape[height_channel]/parameters[2].children[1].value)*j)
                 y_end = y_init + height
             
-                output_image = np.zeros((nb_channels, width, height), np.uint16)
                 if len(image.shape)==2:
-                    output_image[0, :, :] = (image[x_init:x_end, y_init:y_end]).astype('uint16')
-                    tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+                    output_image = np.zeros((width, height), np.uint16)
+                    output_image = (image[x_init:x_end, y_init:y_end]).astype('uint16')
+                    tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
                 else:
+                    output_image = np.zeros((nb_channels, width, height), np.uint16)
                     if image.shape[0]<image.shape[-1]:
                         output_image = (image[:, x_init:x_end, y_init:y_end]).astype('uint16')
-                        tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+                        tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
                     else:
                         output_image = (image[x_init:x_end, y_init:y_end, :]).astype('uint16')
-                        tiff.imsave(os.path.join(output_image_dir, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+                        tiff.imsave(os.path.join(parameters[1].selected, baseName + "_" + str(i) + "_" + str(j) + ".tiff"), output_image)
+
+
+
+"""
+Training and processing calling functions 
+"""
+
+def training(nb_trainings, parameters):
+    for i in range(nb_trainings):
+        if parameters[0][i].selected==None:
+            sys.exit("Training #"+str(i+1)+": You need to select an input directory for training")
+        if parameters[2][i].selected==None:
+            sys.exit("Training #"+str(i+1)+": You need to select an inmput model for transfer learning")
+        if parameters[3][i].selected==None:
+            sys.exit("Training #"+str(i+1)+": You need to select an output directory for the trained classifier")
+    
+        model_name = "MaskRCNN_"+str(parameters[6][i].children[1].value)+"_lr_heads_"+str(parameters[5][i].children[1].value)+"ep_heads_"+str(parameters[9][i].children[1].value)+"_lr_all_"+str(parameters[8][i].children[1].value)+"ep_all_"+str(parameters[10][i].children[1].value)+"DA"
+
+        if parameters[4][i].children[1].value==True and parameters[7][i].children[1].value==True:
+            epoch_groups = [{"layers":"heads","epochs":str(parameters[5][i].children[1].value),"learning_rate":str(parameters[6][i].children[1].value)}, {"layers":"all","epochs":str(parameters[8][i].children[1].value),"learning_rate":str(parameters[9][i].children[1].value)}]
+        else:
+            if parameters[4][i].children[1].value==True:
+                epoch_groups = [{"layers":"heads","epochs":str(parameters[5][i].children[1].value),"learning_rate":str(parameters[6][i].children[1].value)}]
+            elif parameters[7][i].children[1].value==True:
+                epoch_groups = [{"layers":"all","epochs":str(parameters[8][i].children[1].value),"learning_rate":str(parameters[9][i].children[1].value)}]
+            else:
+                sys.exit("Training #"+str(i+1)+": You need to train heads, all network or both")
+
+        model = additional_train.MaskTrain(parameters[0][i].selected, parameters[1][i].selected, parameters[2][i].selected, parameters[3][i].selected, model_name, epoch_groups, parameters[10][i].children[1].value, 0, parameters[11][i].children[1].value, True, 512)
+        model.Train()
+        
+        
+
+def running(nb_runnings, parameters):
+    for i in range(nb_runnings):
+        if parameters[0][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select an input directory for images to be processed")
+        if parameters[1][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select a trained model to run your images")
+        if parameters[2][i].selected==None:
+            sys.exit("Running #"+str(i+1)+": You need to select an output directory for processed images")
+
+        model = additional_segmentation.Segmentation(parameters[1][i].selected, 0.5, 0.35, 2000)
+        model.Run(parameters[0][i].selected, parameters[2][i].selected, [parameters[3][i].children[1].value], 512, 512)
+        del model
+    
+
+"""
+Post-processing functions 
+"""
+def combine_instance_segmentations(parameters):
+    if parameters[0].selected==None:
+        sys.exit("You need to select an input directory for the Mask R-CNN segmentations")
+    if parameters[1].selected==None:
+        sys.exit("You need to select an input directory for the U-Net segmentations")
+    if parameters[2].selected==None:
+        sys.exit("You need to select an output directory")
+    imageFiles1 = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
+    os.makedirs(name=parameters[2].selected, exist_ok=True)
+    
+    for index, imageFile in enumerate(imageFiles1):
+        imagePath1 = os.path.join(parameters[0].selected, imageFile)
+        baseName = os.path.splitext(os.path.basename(imageFile))[0]
+        image1 = skimage.io.imread(imagePath1)
+        imagePath2 = os.path.join(parameters[1].selected, imageFile)
+        image2 = skimage.io.imread(imagePath2)
+
+        if len(image1.shape)>2:
+            if image1.shape[0]<image1.shape[2]:
+                new_image1 = np.zeros((image1.shape[1], image1.shape[2]), np.uint16)
+                new_image1[:, :] = image1[0, :, :]
+            else:
+                new_image1 = np.zeros((image1.shape[0], image1.shape[1]), np.uint16)
+                new_image1[:, :] = image1[:, :, 0]
+            image1 = new_image1
+        if len(image2.shape)>2:
+            if image2.shape[0]<image2.shape[2]:
+                new_image2 = np.zeros((image2.shape[1], image2.shape[2]), np.uint16)
+                new_image2[:, :] = image2[0, :, :]
+            else:
+                new_image2 = np.zeros((image2.shape[0], image2.shape[1]), np.uint16)
+                new_image2[:, :] = image2[:, :, 0]
+            image2 = new_image2
             
+        image1IndexMax = np.max(image1)
+        image1Indices = np.zeros([int(image1IndexMax)], dtype=np.uint32)
+        image2IndexMax = np.max(image2)
+        image2Indices = np.zeros([int(image2IndexMax), 3], dtype=np.uint32)
+        output = np.zeros([image1.shape[0], image1.shape[1]], dtype=np.uint32)
+        for y in range(image2.shape[0]):
+            for x in range(image2.shape[1]):
+                index1 = int(image1[y,x]) - 1
+                index2 = int(image2[y,x]) - 1
+                if index1 >= 0:
+                    if index2 >= 0:
+                        image1Indices[index1] = 1
+                if index2 >= 0:
+                    image2Indices[index2, 1] = image2Indices[index2, 1] + 1
+                    if index1 >= 0:
+                        image2Indices[index2, 0] = image2Indices[index2, 0] + 1
+                
+        currentNucleusIndex = 1
+        for i in range(int(image1IndexMax)):
+            if image1Indices[i] > 0:
+                image1Indices[i] = currentNucleusIndex
+                currentNucleusIndex = currentNucleusIndex + 1
+                
+        for y in range(image2.shape[0]):
+            for x in range(image2.shape[1]):
+                index = int(image1[y,x]) - 1
+                if index >= 0:
+                    if image1Indices[index] > 0:
+                        output[y,x] = image1Indices[index]
+        
+        for i in range(int(image2IndexMax)):
+            if image2Indices[i, 1]>0:
+                if image2Indices[i, 0]>0:
+                    if float(image2Indices[i, 1])/float(image2Indices[i, 0])>2.:
+                        image2Indices[i, 2] = currentNucleusIndex
+                        currentNucleusIndex = currentNucleusIndex + 1
+                else:
+                    image2Indices[i, 2] = currentNucleusIndex
+                    currentNucleusIndex = currentNucleusIndex + 1
+
+        for y in range(image2.shape[0]):
+            for x in range(image2.shape[1]):
+                index = int(image2[y,x]) - 1
+                if index >= 0:
+                    if image2Indices[index, 2] > 0:
+                        output[y,x] = image2Indices[index, 2]
+            
+        tiff.imsave(os.path.join(parameters[2].selected, baseName + ".tiff"), output)
+ 
+
 ## functions needed to merge scales
 def intersections(nucleus1, nucleus2):
     overlap = 0
