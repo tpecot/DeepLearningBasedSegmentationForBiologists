@@ -219,7 +219,7 @@ def running_parameters_interface(nb_trainings):
         label_layout = Layout(width='215px',height='30px')
 
         image_size[i] = HBox([Label('Image size as seen by the network:', layout=label_layout), widgets.IntText(
-            value=1536, description='', disabled=False)])
+            value=1024, description='', disabled=False)])
         display(image_size[i])
 
     parameters.append(input_dir)
