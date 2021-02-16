@@ -125,7 +125,6 @@ class Segmentation:
                     new_image[:, :, k] = image
                 image = new_image
                     
-            print(image.shape)
             image_size_x = image.shape[1]
             image_size_y = image.shape[0]
             
@@ -235,6 +234,4 @@ class Segmentation:
 
                 index = index+1
 
-            print("  Nuclei:", str(totalNucleiCount))
-        
             skimage.io.imsave(os.path.join(outputDir, baseName + ".tiff"), mask_allScales_allImageParts)
