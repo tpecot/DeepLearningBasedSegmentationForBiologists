@@ -546,7 +546,8 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
         imglist_validation_directory = os.path.join(validation_directory, 'images/')
         masklist_validation_directory = os.path.join(validation_directory, 'masks/')
 
-        imageValFileList = [f for f in os.listdir(imglist_validation_directory) if os.path.isfile(os.path.join(imglist_validation_directory, f))]
+        imageValFileList = [f for f in os.listdir(imglist_validation_directory) if ('.png'  in f ) or ('.tif' in f) or ('tiff' in f)]
+        
         for imageFile in imageValFileList:
             baseName = os.path.splitext(os.path.basename(imageFile))[0]
             
@@ -594,7 +595,8 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
             
             channels_validation.append(process_image(current_image))
 
-        imageFileList = [f for f in os.listdir(imglist_training_directory) if os.path.isfile(os.path.join(imglist_training_directory, f))]            
+        imageFileList = [f for f in os.listdir(imglist_training_directory) if ('.png'  in f ) or ('.tif' in f) or ('tiff' in f)]
+        
         for imageFile in imageFileList:
             baseName = os.path.splitext(os.path.basename(imageFile))[0]
             
@@ -642,7 +644,7 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
             channels_training.append(process_image(current_image))
             
     else:
-        imageValFileList = [f for f in os.listdir(imglist_training_directory) if os.path.isfile(os.path.join(imglist_training_directory, f))]
+        imageValFileList = [f for f in os.listdir(imglist_training_directory) if ('.png'  in f ) or ('.tif' in f) or ('tiff' in f)]
         for imageFile in imageValFileList:
             baseName = os.path.splitext(os.path.basename(imageFile))[0]
             imagePath = os.path.join(imglist_training_directory, imageFile)
