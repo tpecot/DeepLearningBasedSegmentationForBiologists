@@ -131,6 +131,7 @@ def training_parameters_interface(nb_trainings):
     nb_epochs_all = np.zeros([nb_trainings], HBox)
     learning_rate_all = np.zeros([nb_trainings], HBox)
     nb_augmentations = np.zeros([nb_trainings], HBox)
+    image_size = np.zeros([nb_trainings], HBox)
     train_to_val_ratio = np.zeros([nb_trainings], HBox)
     
     parameters = []
@@ -178,6 +179,10 @@ def training_parameters_interface(nb_trainings):
             value=100, description='', disabled=False)])
         display(nb_augmentations[i])
 
+        image_size[i] = HBox([Label('Image size as seen by the network:', layout=label_layout), widgets.IntText(
+            value=256, description='', disabled=False)])
+        display(image_size[i])
+
         train_to_val_ratio[i] = HBox([Label('Ratio of training in validation:', layout=label_layout), widgets.BoundedFloatText(
             value=0.2, min=0.01, max=0.99, step=0.01, description='', disabled=False, color='black'
         )])
@@ -194,6 +199,7 @@ def training_parameters_interface(nb_trainings):
     parameters.append(nb_epochs_all)
     parameters.append(learning_rate_all)
     parameters.append(nb_augmentations)
+    parameters.append(image_size)
     parameters.append(train_to_val_ratio)
     
     return parameters  
@@ -219,7 +225,7 @@ def running_parameters_interface(nb_trainings):
         label_layout = Layout(width='215px',height='30px')
 
         image_size[i] = HBox([Label('Image size as seen by the network:', layout=label_layout), widgets.IntText(
-            value=1024, description='', disabled=False)])
+            value=256, description='', disabled=False)])
         display(image_size[i])
 
     parameters.append(input_dir)
@@ -372,7 +378,7 @@ def training(nb_trainings, parameters):
             else:
                 sys.exit("Training #"+str(i+1)+": You need to train heads, all network or both")
 
-        model = additional_train.MaskTrain(parameters[0][i].selected, parameters[1][i].selected, parameters[2][i].selected, parameters[3][i].selected, model_name, epoch_groups, parameters[10][i].children[1].value, 0, parameters[11][i].children[1].value, True, 0.5, 0.6, 512)
+        model = additional_train.MaskTrain(parameters[0][i].selected, parameters[1][i].selected, parameters[2][i].selected, parameters[3][i].selected, model_name, epoch_groups, parameters[10][i].children[1].value, 0, parameters[12][i].children[1].value, True, 0.5, 0.6, parameters[11][i].children[1].value)
         model.Train()
         
         
@@ -404,6 +410,10 @@ def combine_instance_segmentations(parameters):
     imageFiles1 = [f for f in os.listdir(parameters[0].selected) if os.path.isfile(os.path.join(parameters[0].selected, f))]
     os.makedirs(name=parameters[2].selected, exist_ok=True)
     
+    threshold_min = 0.2
+    threshold_max = 3.
+    min_nucleus_size = 35
+    max_nucleus_size = 1000
     for index, imageFile in enumerate(imageFiles1):
         imagePath1 = os.path.join(parameters[0].selected, imageFile)
         baseName = os.path.splitext(os.path.basename(imageFile))[0]
@@ -429,7 +439,7 @@ def combine_instance_segmentations(parameters):
             image2 = new_image2
             
         image1IndexMax = np.max(image1)
-        image1Indices = np.zeros([int(image1IndexMax)], dtype=np.uint32)
+        image1Indices = np.zeros([int(image1IndexMax), 3], dtype=np.uint32)
         image2IndexMax = np.max(image2)
         image2Indices = np.zeros([int(image2IndexMax), 3], dtype=np.uint32)
         output = np.zeros([image1.shape[0], image1.shape[1]], dtype=np.uint32)
@@ -438,30 +448,44 @@ def combine_instance_segmentations(parameters):
                 index1 = int(image1[y,x]) - 1
                 index2 = int(image2[y,x]) - 1
                 if index1 >= 0:
+                    image1Indices[index1, 1] += 1
                     if index2 >= 0:
-                        image1Indices[index1] = 1
-                if index2 >= 0:
-                    image2Indices[index2, 1] = image2Indices[index2, 1] + 1
-                    if index1 >= 0:
-                        image2Indices[index2, 0] = image2Indices[index2, 0] + 1
+                        image1Indices[index1, 0] += 1
+#                if index2 >= 0:
+#                    image2Indices[index2, 1] += 1
+#                    if index1 >= 0:
+#                        image2Indices[index2, 0] += 1
                 
         currentNucleusIndex = 1
         for i in range(int(image1IndexMax)):
-            if image1Indices[i] > 0:
-                image1Indices[i] = currentNucleusIndex
-                currentNucleusIndex = currentNucleusIndex + 1
+            if image1Indices[i, 1]>min_nucleus_size and image1Indices[i, 1]<max_nucleus_size:
+                if image1Indices[i, 0]>0:
+                    if float(image1Indices[i, 0])/float(image1Indices[i, 1])>threshold_min: 
+                        image1Indices[i, 2] = currentNucleusIndex
+                        currentNucleusIndex = currentNucleusIndex + 1
                 
         for y in range(image2.shape[0]):
             for x in range(image2.shape[1]):
                 index = int(image1[y,x]) - 1
                 if index >= 0:
-                    if image1Indices[index] > 0:
-                        output[y,x] = image1Indices[index]
+                    if image1Indices[index, 2] > 0:
+                        output[y,x] = image1Indices[index, 2]
         
+        for y in range(image2.shape[0]):
+            for x in range(image2.shape[1]):
+                index1 = int(image1[y,x]) - 1
+                index2 = int(image2[y,x]) - 1
+                if index2 >= 0:
+                    image2Indices[index2, 1] += 1
+                    if index1 >= 0:
+                        if image1Indices[index1, 2] > 0: 
+                            image2Indices[index2, 0] += 1
+                        
         for i in range(int(image2IndexMax)):
-            if image2Indices[i, 1]>0:
+            if image2Indices[i, 1]>min_nucleus_size:
                 if image2Indices[i, 0]>0:
-                    if float(image2Indices[i, 1])/float(image2Indices[i, 0])>2.:
+                    if float(image2Indices[i, 1])/float(image2Indices[i, 0])>threshold_max:
+                        float(image2Indices[i, 1])<1000 
                         image2Indices[i, 2] = currentNucleusIndex
                         currentNucleusIndex = currentNucleusIndex + 1
                 else:
