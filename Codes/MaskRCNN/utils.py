@@ -225,7 +225,7 @@ def running_parameters_interface(nb_trainings):
         label_layout = Layout(width='215px',height='30px')
 
         image_size[i] = HBox([Label('Image size as seen by the network:', layout=label_layout), widgets.IntText(
-            value=256, description='', disabled=False)])
+            value=512, description='', disabled=False)])
         display(image_size[i])
 
     parameters.append(input_dir)
@@ -393,7 +393,7 @@ def running(nb_runnings, parameters):
             sys.exit("Running #"+str(i+1)+": You need to select an output directory for processed images")
 
         model = additional_segmentation.Segmentation(parameters[1][i].selected, 0.5, 0.35, 2000)
-        model.Run(parameters[0][i].selected, parameters[2][i].selected, [parameters[3][i].children[1].value], 512, 512)
+        model.Run(parameters[0][i].selected, parameters[2][i].selected, [parameters[3][i].children[1].value], 256, 256)
         del model
     
 
