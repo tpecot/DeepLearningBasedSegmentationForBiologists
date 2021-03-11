@@ -5,7 +5,7 @@
 // input parameters
 #@ File (label = "Input directory", style = "directory") input
 #@ File (label = "Output directory", style = "directory") output
-#@ String (label = "File suffix", value = ".tif") suffix
+#@ String (label = "File suffix", value = ".tiff") suffix
 
 // call to the main function "processFolder"
 processFolder(input);
@@ -35,7 +35,10 @@ function processFolder(input) {
 }
 
 function processFile(input, output, file) {
-	
+
+	///////////// parameters /////////////////////
+	threshold_on_background = 0.95;
+	threshold_on_nuclei_minus_contours = 0.3;
 	///////////// define nuclei segmentation masks as ROIs /////////////////
 	// open image
 	open(input+"/"+file);
@@ -45,7 +48,7 @@ function processFile(input, output, file) {
 	run("Split Channels");
 	// select channel 3 (background), high scores correspond to objects 
 	selectWindow("C3-Input");
-	setThreshold(0, 0.95);
+	setThreshold(0, threshold_on_background);
 	run("Convert to Mask");
 	rename("Object component");
 	// remove small objects (<10 pixels)
@@ -57,7 +60,7 @@ function processFile(input, output, file) {
 	// subtract nuclei component from nuclei contours
 	imageCalculator("Subtract create 32-bit", "C2-Input","C1-Input");
 	// threshold the subtraction
-	setThreshold(0.1, 2.0000);
+	setThreshold(threshold_on_nuclei_minus_contours, 2.0000);
 	run("Convert to Mask");
 	// extract connected components to identify individual nuclei
 	run("Connected Components Labeling", "connectivity=4 type=[16 bits]");
