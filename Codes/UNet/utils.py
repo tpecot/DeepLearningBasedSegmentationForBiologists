@@ -708,17 +708,8 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
     Y_test =[]
     for k in range(len(X_test)):
         X_test[k] = process_image(X_test[k])
-        if X_test[k].shape[0]==imaging_field_x:
-            start_dim1 = 0
-        else:
-            start_dim1 = np.random.randint(low=0, high=X_test[k].shape[0] - imaging_field_x)
-        if X_test[k].shape[1]==imaging_field_y:
-            start_dim2 = 0
-        else:
-            start_dim2 = np.random.randint(low=0, high=X_test[k].shape[1] - imaging_field_y)
-    
-        X_test[k] = X_test[k][start_dim1:start_dim1 + imaging_field_x, start_dim2:start_dim2 + imaging_field_y, :]
-        Y_test.append(labels_validation[k][start_dim1:start_dim1 + imaging_field_x, start_dim2:start_dim2 + imaging_field_y, :])
+        X_test[k] = X_test[k][0:imaging_field_x, 0:imaging_field_y, :]
+        Y_test.append(labels_validation[k][0:imaging_field_x, 0:imaging_field_y, :])
         
     train_dict = {"channels": channels_training, "labels": labels_training}
 
