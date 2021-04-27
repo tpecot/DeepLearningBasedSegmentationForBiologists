@@ -40,14 +40,18 @@ class MaskTrain:
         detNMSThresh = 0.35
         rpnNMSThresh = 0.55
         trainDir = os.path.join(os.curdir, self.__mParams["train_dir"])
-        evalDir = os.path.join(os.curdir, self.__mParams["eval_dir"])
         inModelPath = os.path.join(os.curdir, self.__mParams["input_model"])
         os.makedirs(name=self.__mParams["output_dir"], exist_ok=True)
         outModelPath = os.path.join(self.__mParams["output_dir"], self.__mParams["model_name"] + ".h5")
 
         blankInput = True
 
-        if "eval_dir" in self.__mParams:
+        if self.__mParams["eval_dir"]!=None:
+            evalDir = os.path.join(os.curdir, self.__mParams["eval_dir"])
+        else:
+            evalDir = None
+
+            if "eval_dir" in self.__mParams:
             evalDir = os.path.join(os.curdir, self.__mParams["eval_dir"])
 
         if "image_size" in self.__mParams:
