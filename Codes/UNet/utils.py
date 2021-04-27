@@ -12,7 +12,10 @@ Import python packages
 
 import numpy as np
 import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.WARN)
+
 import skimage
+import tempfile
 
 import sys
 import os
@@ -21,11 +24,14 @@ from scipy.misc import bytescale
 import threading
 from threading import Thread, Lock
 import h5py
+import csv
+import shutil
 
 from skimage.io import imread, imsave
 import skimage as sk
 import tifffile as tiff
-
+import cv2
+  
 import imgaug
 import imgaug.augmenters as iaa
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
@@ -43,7 +49,13 @@ from ipyfilechooser import FileChooser
 from ipywidgets import HBox, Label, Layout
 
 from models import unet as unet
+from models import inceptionV3 as inceptionV3
+from deeplabv3p import Deeplabv3
+from keras.utils import np_utils
 
+from stardist import fill_label_holes, random_label_cmap, calculate_extents, gputools_available
+from stardist.matching import matching, matching_dataset
+from stardist.models import Config2D, StarDist2D, StarDistData2D
 
 """
 Interfaces
@@ -130,6 +142,7 @@ def training_parameters_interface(nb_trainings):
     training_dir = np.zeros([nb_trainings], FileChooser)
     validation_dir = np.zeros([nb_trainings], FileChooser)
     output_dir = np.zeros([nb_trainings], FileChooser)
+    saved_model = np.zeros([nb_trainings], HBox)
     nb_channels = np.zeros([nb_trainings], HBox)
     nb_classes = np.zeros([nb_trainings], HBox)
     imaging_field_x = np.zeros([nb_trainings], HBox)
@@ -152,7 +165,11 @@ def training_parameters_interface(nb_trainings):
         output_dir[i] = FileChooser('./trainedClassifiers')
         display(output_dir[i])
 
-        label_layout = Layout(width='180px',height='30px')
+        label_layout = Layout(width='200px',height='30px')
+
+        saved_model[i] = HBox([Label('Saving model as TF SavedModel:', layout=label_layout), widgets.Checkbox(
+            value=False, description='',disabled=False)])
+        display(saved_model[i])
 
         nb_channels[i] = HBox([Label('Number of channels:', layout=label_layout), widgets.IntText(
             value=1, description='', disabled=False)])
@@ -194,6 +211,7 @@ def training_parameters_interface(nb_trainings):
     parameters.append(training_dir)
     parameters.append(validation_dir)
     parameters.append(output_dir)
+    parameters.append(saved_model)
     parameters.append(nb_channels)
     parameters.append(nb_classes)
     parameters.append(imaging_field_x)
@@ -437,12 +455,11 @@ def training(nb_trainings, parameters):
             sys.exit("Training #"+str(i+1)+": You need to select an output directory for the trained classifier")
     
 
-        model = unet(parameters[4][i].children[1].value, parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[3][i].children[1].value)
-        model_name = "UNet_"+str(parameters[3][i].children[1].value)+"ch_"+str(parameters[4][i].children[1].value)+"cl_"+str(parameters[5][i].children[1].value)+"_"+str(parameters[6][i].children[1].value)+"_lr_"+str(parameters[7][i].children[1].value)+"_"+str(parameters[9][i].children[1].value)+"DA_"+str(parameters[8][i].children[1].value)+"ep"
+        model = unet(parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[7][i].children[1].value, parameters[4][i].children[1].value)
+        model_name = "UNet_"+str(parameters[4][i].children[1].value)+"ch_"+str(parameters[5][i].children[1].value)+"cl_"+str(parameters[6][i].children[1].value)+"_"+str(parameters[7][i].children[1].value)+"_lr_"+str(parameters[8][i].children[1].value)+"_"+str(parameters[10][i].children[1].value)+"DA_"+str(parameters[9][i].children[1].value)+"ep"
 
-        train_model_sample(model, parameters[0][i].selected, parameters[1][i].selected, model_name,parameters[10][i].children[1].value, parameters[8][i].children[1].value, parameters[5][i].children[1].value, parameters[6][i].children[1].value, parameters[2][i].selected, parameters[7][i].children[1].value, parameters[9][i].children[1].value, parameters[11][i].children[1].value)
+        train_model_sample(model, parameters[0][i].selected, parameters[1][i].selected, model_name,parameters[11][i].children[1].value, parameters[9][i].children[1].value, parameters[6][i].children[1].value, parameters[7][i].children[1].value, parameters[2][i].selected, parameters[3][i].children[1].value, parameters[8][i].children[1].value, parameters[10][i].children[1].value, parameters[12][i].children[1].value)
         del model
-        
         
 
 def running(nb_runnings, parameters):
@@ -462,7 +479,6 @@ def running(nb_runnings, parameters):
 """
 Useful functions 
 """
-    
 def rate_scheduler(lr = .001, decay = 0.95):
     def output_fn(epoch):
         epoch = np.int(epoch)
@@ -501,7 +517,7 @@ def process_image(img):
 
 def getfiles(direc_name):
     imglist = os.listdir(direc_name)
-    imgfiles = [i for i in imglist if ('.png'  in i ) or ('.tif' in i) or ('tiff' in i)]
+    imgfiles = [i for i in imglist if ('.png'  in i ) or ('.jpg'  in i ) or ('.tif' in i) or ('tiff' in i)]
 
     imgfiles = imgfiles
     return imgfiles
@@ -509,10 +525,9 @@ def getfiles(direc_name):
 def get_image(file_name):
     if ('.tif' in file_name) or ('tiff' in file_name):
         im = tiff.imread(file_name)
-        im = bytescale(im)
         im = np.float32(im)
     else:
-        im = np.float32(imread(file_name))
+        im = cv2.imread(file_name) 
         
     if len(im.shape) < 3:
         output_im = np.zeros((im.shape[0], im.shape[1], 1))
@@ -713,7 +728,8 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
         
     train_dict = {"channels": channels_training, "labels": labels_training}
 
-    return train_dict, (np.asarray(X_test).astype('float32'), np.asarray(Y_test).astype('int32'))
+    return train_dict, (np.asarray(X_test).astype('float32'), np.asarray(Y_test).astype('float32'))
+
 
 
 def random_sample_generator(x_init, y_init, batch_size, n_channels, n_classes, dim1, dim2):
@@ -765,7 +781,7 @@ def random_sample_generator(x_init, y_init, batch_size, n_channels, n_classes, d
         # return the buffer
         yield(x, y)
 
-
+        
 def GenerateRandomImgaugAugmentation(
         pAugmentationLevel=5,           # number of augmentations
         pEnableFlipping1=True,          # enable x flipping
@@ -975,7 +991,8 @@ def weighted_crossentropy(class_weights):
 def train_model_sample(model = None, dataset_training = None,  dataset_validation = None,
                        model_name = "model", batch_size = 5, n_epoch = 100, 
                        imaging_field_x = 256, imaging_field_y = 256, 
-                       output_dir = "./trained_classifiers/", learning_rate = 1e-3, nb_augmentations = 0,
+                       output_dir = "./trained_classifiers/", saved_model = True,
+                       learning_rate = 1e-3, nb_augmentations = 0,
                        train_to_val_ratio = 0.2):
 
     if dataset_training is None:
@@ -1016,6 +1033,7 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
 
     # prepare the model compilation
     optimizer = RMSprop(lr=learning_rate)
+    #optimizer = SGD(lr = learning_rate, decay = 1e-07, momentum = 0.9, nesterov = True)
     model.compile(loss = weighted_crossentropy(class_weights = class_weights), optimizer = optimizer, metrics=['accuracy'])
 
     # prepare the generation of data
@@ -1031,6 +1049,34 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
                                        epochs=n_epoch, validation_data=(X_test,Y_test), 
                                        callbacks = [ModelCheckpoint(file_name_save, monitor = 'val_loss', verbose = 0, save_best_only = True, mode = 'auto',save_weights_only = True),LearningRateScheduler(lr_sched),tensorboard_callback])
     
+    if saved_model==True:
+        save_path = os.path.join(output_dir, model_name)
+        tmp_path = tempfile.TemporaryDirectory()
+
+        signature = tf.saved_model.signature_def_utils.predict_signature_def(inputs={'image': model.input}, outputs={'scores': model.output})
+        builder = tf.saved_model.builder.SavedModelBuilder(os.path.abspath(tmp_path.name))
+        builder.add_meta_graph_and_variables(
+            sess=K.get_session(),
+            tags=[tf.saved_model.tag_constants.SERVING],
+            signature_def_map={
+                tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                signature
+            })
+    
+        verbose = builder.save()
+        verbose = shutil.copytree(tmp_path.name, save_path)
+        verbose = shutil.make_archive(save_path, "zip", save_path, "./")
+        for filename in os.listdir(save_path):
+            file_path = os.path.join(save_path, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print('Failed to delete %s. Reason: %s' % (file_path, e))
+        shutil.rmtree(save_path)
+
 
 """
 Executing convnets
@@ -1142,16 +1188,16 @@ def run_models_on_directory(data_location, output_location, model, score):
         processed_image = run_model(img, model, imaging_field_x = imaging_field_x, imaging_field_y = imaging_field_y)
         
         if score==False:
-            output_image = np.zeros((processed_image.shape[2], processed_image.shape[0], processed_image.shape[1]), np.uint16)
+            output_image = np.zeros((processed_image.shape[2], processed_image.shape[0], processed_image.shape[1]), np.uint8)
             max_channels = np.argmax(processed_image, axis=2)
             for i in range(output_image.shape[0]):
-                output_image[i-1, : , :] = np.where(max_channels == i, 1, 0)
+                output_image[i-1, : , :] = np.where(max_channels == i, 255, 0)
             # Save images
             cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
             tiff.imsave(cnnout_name, output_image)
         else:
             # Save images
             cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
-            tiff.imsave(cnnout_name, processed_image)
+            tiff.imsave(cnnout_name, processed_image.astype('float16'))
 
         counter += 1
