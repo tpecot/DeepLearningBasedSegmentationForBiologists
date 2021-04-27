@@ -525,6 +525,7 @@ def getfiles(direc_name):
 def get_image(file_name):
     if ('.tif' in file_name) or ('tiff' in file_name):
         im = tiff.imread(file_name)
+        im = bytescale(im)
         im = np.float32(im)
     else:
         im = cv2.imread(file_name) 
@@ -1198,6 +1199,6 @@ def run_models_on_directory(data_location, output_location, model, score):
         else:
             # Save images
             cnnout_name = os.path.join(output_location, os.path.splitext(img_list_files[0][counter])[0] + ".tiff")
-            tiff.imsave(cnnout_name, processed_image.astype('float16'))
+            tiff.imsave(cnnout_name, processed_image)
 
         counter += 1
