@@ -67,66 +67,6 @@ class NucleiDataset(mrcnn_utils.Dataset):
                 imageIndex += 1
 
 
-    def initialize_only_augmented(self, pImagesAndMasks, pAugmentationLevel = 0):
-        self.add_class("nuclei", 1, "nucleus")
-
-        imageIndex = 0
-
-        for imageFile, maskFile in pImagesAndMasks.items():
-            baseName = os.path.splitext(os.path.basename(imageFile))[0]
-
-            image = skimage.io.imread(imageFile)
-            if image.ndim == 1:
-                print("Problem: the images in the training dataset are 1 dimension only")
-                continue
-            if image.ndim == 2:
-                new_image = numpy.zeros((image.shape[0], image.shape[1], 3), numpy.uint8)
-                for k in range(3):
-                    new_image[:,:,k] = (image[:, :, 0]).astype('uint8')
-                image = new_image    
-            if image.ndim > 3:
-                print("Problem: the images in the training dataset are more than 2D + C")
-                continue
-            if image.dtype != numpy.uint8:
-                image = image.astype('uint8')
-                
-            #adding augmentation parameters
-            for augment in range(pAugmentationLevel):
-                augmentationMap, widthFactor, heightFactor, switchWidthHeight = image_augmentation.GenerateRandomImgaugAugmentation()
-                width = int(float(image.shape[1])*widthFactor)
-                height = int(float(image.shape[0])*heightFactor)
-                if switchWidthHeight:
-                    width, height = height, width
-                self.add_image(source="nuclei", image_id=imageIndex, path=imageFile, name=baseName, width=width, height=height, mask_path=maskFile, augmentation_params=augmentationMap)
-                imageIndex += 1
-
-
-    def initializePartially(self, pImagesAndMasks, initIndex, endIndex, pAugmentationLevel = 0):
-        self.add_class("nuclei", 1, "nucleus")
-
-        imageIndex = 0
-        
-        for imageFile, maskFile in list(pImagesAndMasks.items())[initIndex:endIndex]:
-            baseName = os.path.splitext(os.path.basename(imageFile))[0]
-
-            image = skimage.io.imread(imageFile)
-            if image.ndim < 2 or image.dtype != numpy.uint8:
-                continue
-
-            self.add_image(source="nuclei", image_id=imageIndex, path=imageFile, name=baseName, width=image.shape[1], height=image.shape[0], mask_path=maskFile, augmentation_params=None)
-            imageIndex += 1
-
-            #adding augmentation parameters
-            for augment in range(pAugmentationLevel):
-                augmentationMap, widthFactor, heightFactor, switchWidthHeight = image_augmentation.GenerateRandomImgaugAugmentation()
-                width = int(float(image.shape[1])*widthFactor)
-                height = int(float(image.shape[0])*heightFactor)
-                if switchWidthHeight:
-                    width, height = height, width
-                self.add_image(source="nuclei", image_id=imageIndex, path=imageFile, name=baseName, width=width, height=height, mask_path=maskFile, augmentation_params=augmentationMap)
-                imageIndex += 1
-
-
     def image_reference(self, image_id):
         info = self.image_info[image_id]
         ref = info["name"]
