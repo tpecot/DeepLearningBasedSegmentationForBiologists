@@ -21,13 +21,6 @@ def RCNNConvertInputImage(pImageData):
                 new_pImageData[:,:,k] = (pImageData[:, :, pImageData.shape[2]-1]).astype('uint8')
             pImageData = new_pImageData
             
-#    if pImageData.ndim < 2:
-#        raise ValueError("Invalid image")
-#    elif pImageData.ndim < 3:
-#        pImageData = skimage.color.gray2rgb(pImageData)
-#    if pImageData.shape[2] > 3:
-#        pImageData = pImageData[:, :, :3]
-
     return pImageData
 
 def MergeMasks(pMasks):
