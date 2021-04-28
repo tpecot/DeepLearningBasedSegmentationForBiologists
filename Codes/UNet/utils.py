@@ -491,9 +491,8 @@ def process_image(img):
     if img.shape[2] == 1:
         output = np.zeros((img.shape[0], img.shape[1], 1), 'float32')
         
-        percentile = 99.9
-        high = np.percentile(img, percentile)
-        low = np.percentile(img, 100-percentile)
+        high = np.percentile(img, 99.9)
+        low = np.percentile(img, 1)
 
         output = np.minimum(high, img)
         output = np.maximum(low, output)
