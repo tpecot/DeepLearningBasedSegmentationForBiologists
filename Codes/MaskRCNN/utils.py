@@ -392,6 +392,8 @@ def running(nb_runnings, parameters):
         if parameters[2][i].selected==None:
             sys.exit("Running #"+str(i+1)+": You need to select an output directory for processed images")
 
+        # last parameter for memory
+        # if crashes down, downsize it
         model = additional_segmentation.Segmentation(parameters[1][i].selected, 0.5, 0.35, 2000)
         model.Run(parameters[0][i].selected, parameters[2][i].selected, [parameters[3][i].children[1].value], 256, 256)
         del model

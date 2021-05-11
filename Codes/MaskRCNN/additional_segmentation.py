@@ -15,7 +15,6 @@ import skimage.morphology
 import math
 import mrcnn_utils
 
-
 class Segmentation:
     __mModel = None
     __mConfig = None

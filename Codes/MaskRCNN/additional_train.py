@@ -11,6 +11,10 @@ import mrcnn_model
 import mrcnn_utils
 import mask_rcnn_additional
 import random
+#import tensorflow
+
+#from tensorflow.compat.v1 import ConfigProto
+#from tensorflow.compat.v1 import InteractiveSession
 
 class MaskTrain:
     __mParams = {}
@@ -30,6 +34,10 @@ class MaskTrain:
         
 
     def Train(self):
+        #config = ConfigProto()
+        #config.gpu_options.allow_growth = True
+        #session = InteractiveSession(config=config)
+
         fixedRandomSeed = 0
         trainToValidationChance = 0.2
         includeEvaluationInValidation = True
@@ -50,9 +58,6 @@ class MaskTrain:
             evalDir = os.path.join(os.curdir, self.__mParams["eval_dir"])
         else:
             evalDir = None
-
-            if "eval_dir" in self.__mParams:
-            evalDir = os.path.join(os.curdir, self.__mParams["eval_dir"])
 
         if "image_size" in self.__mParams:
             maxdim = self.__mParams["image_size"]
