@@ -12,7 +12,14 @@ Import python packages
 
 import numpy as np
 import tensorflow as tf
+
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.WARN)
+#from tensorflow.compat.v1 import ConfigProto
+#from tensorflow.compat.v1 import InteractiveSession
+#config = ConfigProto()
+#config.gpu_options.allow_growth = True
+#session = InteractiveSession(config=config)
+
 
 import skimage
 import tempfile
@@ -31,7 +38,8 @@ from skimage.io import imread, imsave
 import skimage as sk
 import tifffile as tiff
 import cv2
-  
+import matplotlib.pyplot as plt
+
 import imgaug
 import imgaug.augmenters as iaa
 from imgaug.augmentables.segmaps import SegmentationMapsOnImage
@@ -49,13 +57,8 @@ from ipyfilechooser import FileChooser
 from ipywidgets import HBox, Label, Layout
 
 from models import unet as unet
-from models import inceptionV3 as inceptionV3
-from deeplabv3p import Deeplabv3
 from keras.utils import np_utils
 
-from stardist import fill_label_holes, random_label_cmap, calculate_extents, gputools_available
-from stardist.matching import matching, matching_dataset
-from stardist.models import Config2D, StarDist2D, StarDistData2D
 
 """
 Interfaces
@@ -491,8 +494,9 @@ def process_image(img):
     if img.shape[2] == 1:
         output = np.zeros((img.shape[0], img.shape[1], 1), 'float32')
         
-        high = np.percentile(img, 99.9)
-        low = np.percentile(img, 1)
+        percentile = 98.
+        high = np.percentile(img, percentile)
+        low = np.percentile(img, 100-percentile)
 
         output = np.minimum(high, img)
         output = np.maximum(low, output)
@@ -502,16 +506,14 @@ def process_image(img):
     else:
         output = np.zeros((img.shape[0], img.shape[1], img.shape[2]), 'float32')
         for i in range(img.shape[2]):
-            percentile = 99.9
+            percentile = 98.
             high = np.percentile(img[:,:,i], percentile)
             low = np.percentile(img[:,:,i], 100-percentile)
             
             output[:,:,i] = np.minimum(high, img[:,:,i])
             output[:,:,i] = np.maximum(low, output[:,:,i])
-            
-            if high>low:
-                output[:,:,i] = (output[:,:,i] - low) / (high - low)
-
+            output[:,:,i] = (output[:,:,i] - low) / (high - low)
+    
     return output
 
 def getfiles(direc_name):
@@ -524,7 +526,6 @@ def getfiles(direc_name):
 def get_image(file_name):
     if ('.tif' in file_name) or ('tiff' in file_name):
         im = tiff.imread(file_name)
-        im = bytescale(im)
         im = np.float32(im)
     else:
         im = cv2.imread(file_name) 
@@ -608,7 +609,7 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
             if current_image.shape[2]!=nb_channels:
                 sys.exit("The image " + baseName + " has a different number of channels than indicated in the U-Net architecture")
             
-            channels_validation.append(process_image(current_image))
+            channels_validation.append(process_image(np.asarray(current_image).astype('float32')))
 
         imageFileList = [f for f in os.listdir(imglist_training_directory) if ('.png'  in f ) or ('.tif' in f) or ('tiff' in f)]
         
@@ -656,7 +657,7 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
             if current_image.shape[2]!=nb_channels:
                 sys.exit("The image " + baseName + " has a different number of channels than indicated in the U-Net architecture")
             
-            channels_training.append(process_image(current_image))
+            channels_training.append(process_image(np.asarray(current_image).astype('float32')))
             
     else:
         imageValFileList = [f for f in os.listdir(imglist_training_directory) if ('.png'  in f ) or ('.tif' in f) or ('tiff' in f)]
@@ -703,10 +704,10 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
                     
         
             if random.Random().random() > validation_training_ratio:
-                channels_training.append(process_image(current_image))
+                channels_training.append(process_image(np.asarray(current_image).astype('float32')))
                 labels_training.append(current_mask.astype('int32'))
             else:
-                channels_validation.append(process_image(current_image))
+                channels_validation.append(process_image(np.asarray(current_image).astype('float32')))
                 labels_validation.append(current_mask.astype('int32'))
 
                 
@@ -722,13 +723,12 @@ def get_data_sample(training_directory, validation_directory, nb_channels = 1, n
     X_test = channels_validation
     Y_test =[]
     for k in range(len(X_test)):
-        X_test[k] = process_image(X_test[k])
         X_test[k] = X_test[k][0:imaging_field_x, 0:imaging_field_y, :]
         Y_test.append(labels_validation[k][0:imaging_field_x, 0:imaging_field_y, :])
         
     train_dict = {"channels": channels_training, "labels": labels_training}
 
-    return train_dict, (np.asarray(X_test).astype('float32'), np.asarray(Y_test).astype('float32'))
+    return train_dict, (np.asarray(X_test).astype('float32'), np.asarray(Y_test).astype('int32'))
 
 
 
@@ -743,8 +743,8 @@ def random_sample_generator(x_init, y_init, batch_size, n_channels, n_classes, d
     while(True):
 
         # buffers for a batch of data
-        x = np.zeros((batch_size, dim1, dim2, n_channels))
-        y = np.zeros((batch_size, dim1, dim2, n_classes))
+        x = np.zeros((batch_size, dim1, dim2, n_channels), 'float32')
+        y = np.zeros((batch_size, dim1, dim2, n_classes), 'int32')
         
         for k in range(batch_size):
 
@@ -770,13 +770,11 @@ def random_sample_generator(x_init, y_init, batch_size, n_channels, n_classes, d
             patch_x = np.asarray(patch_x)
             patch_y = np.asarray(patch_y)
 
-            # image normalization
-            patch_x = patch_x.astype('float32')
-
             # save image to buffer
             x[k, :, :, :] = patch_x
             y[k, :, :, :] = patch_y
             cpt += 1
+            
 
         # return the buffer
         yield(x, y)
@@ -918,8 +916,8 @@ def random_sample_generator_dataAugmentation(x_init, y_init, batch_size, n_chann
     while(True):
 
         # buffers for a batch of data
-        x = np.zeros((batch_size, dim1, dim2, n_channels))
-        y = np.zeros((batch_size, dim1, dim2, n_classes))
+        x = np.zeros((batch_size, dim1, dim2, n_channels), 'float32')
+        y = np.zeros((batch_size, dim1, dim2, n_classes), 'int32')
         
         for k in range(batch_size):
             
@@ -934,11 +932,11 @@ def random_sample_generator_dataAugmentation(x_init, y_init, batch_size, n_chann
             segmap = SegmentationMapsOnImage(y_big, shape=x_big.shape)
             augmentationMap = GenerateRandomImgaugAugmentation()
 
-            x_aug, segmap = augmentationMap(image=x_big.astype('float32'), segmentation_maps=segmap)
+            x_aug, segmap = augmentationMap(image=x_big, segmentation_maps=segmap)
             y_aug = segmap.get_arr()
             
             # image normalization
-            x_norm = x_aug.astype('float32')
+            x_norm = x_aug
 
             # get random crop
             if dim1==x_big.shape[0]:
@@ -960,8 +958,8 @@ def random_sample_generator_dataAugmentation(x_init, y_init, batch_size, n_chann
             patch_x = x_aug[start_dim1:start_dim1 + dim1, start_dim2:start_dim2 + dim2, :]
             patch_y = y_aug[start_dim1:start_dim1 + dim1, start_dim2:start_dim2 + dim2, :]
             
-            patch_x = np.asarray(patch_x)
-            patch_y = np.asarray(patch_y).astype('int32')
+            patch_x = patch_x
+            patch_y = patch_y
 
             # save image to buffer
             x[k, :, :, :] = patch_x
@@ -1033,7 +1031,6 @@ def train_model_sample(model = None, dataset_training = None,  dataset_validatio
 
     # prepare the model compilation
     optimizer = RMSprop(lr=learning_rate)
-    #optimizer = SGD(lr = learning_rate, decay = 1e-07, momentum = 0.9, nesterov = True)
     model.compile(loss = weighted_crossentropy(class_weights = class_weights), optimizer = optimizer, metrics=['accuracy'])
 
     # prepare the generation of data
@@ -1124,8 +1121,8 @@ def run_model(img, model, imaging_field_x = 256, imaging_field_y = 256):
     n_classes = model.layers[-1].output_shape[-1]
     image_size_x = img.shape[1]
     image_size_y = img.shape[2]
-    model_output = np.zeros((image_size_x-10,image_size_y-10,n_classes), dtype = np.float32)
-    current_output = np.zeros((1,imaging_field_x,imaging_field_y,n_classes), dtype = np.float32)
+    model_output = np.zeros((image_size_x-10,image_size_y-10,n_classes))
+    current_output = np.zeros((1,imaging_field_x,imaging_field_y,n_classes))
     
     x_iterator = 0
     y_iterator = 0
